@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todolist-deployment
+  namespace: andrei
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: todolist
+  template:
+    metadata:
+      labels:
+        app: todolist
+    spec:
+      containers:
+      - name: todolist-container
+        image: andrei3009/todolist
+        ports:
+        - containerPort: 3000

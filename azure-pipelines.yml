@@ -1,0 +1,98 @@
+trigger:
+- main
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+- stage: Build_image_test_and_push 
+  jobs:
+  - job: 
+    steps:
+    - task: Bash@3
+      displayName: 'Build image'
+      inputs:
+        targetType: 'inline'
+        script: |
+          docker build -t andreiapp.azurecr.io/todolist:latest .
+
+    - task: Bash@3
+      displayName: 'Start container'
+      inputs:
+        targetType: 'inline'
+        script: |
+          docker run -dp 3000:3000 andreiapp.azurecr.io/todolist:latest 
+
+    - task: Bash@3
+      displayName: 'Smoke test'
+      inputs:
+        targetType: 'inline'
+        script: |
+          sleep 10s
+          # Use the host machine's IP address instead of localhost
+          HOST_IP=$(hostname -I | cut -d' ' -f1)
+          wget "$HOST_IP:3000"
+          TEST_RESULT=$?
+          docker ps
+    - task: AzureCLI@2
+      displayName: 'Push image'
+      inputs:
+        azureSubscription: 'Azure subscription 1(23aa544a-49f9-4e24-9e8e-8e3c663e6af3)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          if [ "${TEST_RESULT}" == 0 ]
+          then         
+            az acr login -n andreiapp
+            docker push andreiapp.azurecr.io/todolist:latest
+          fi
+          
+    - task: CopyFiles@2
+      inputs:
+        Contents: 'deployment.yaml'
+        TargetFolder: '$(build.artifactstagingdirectory)'
+
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
+
+
+# - job: Publish_image
+#   steps:
+#   - task: Docker@2
+#     displayName: Build and push an image to container registry
+#     inputs:
+#       command: push
+#       repository: $(registryname)
+#       containerRegistry: DR Gabriela
+#       tags: |
+#         weatherapp
+
+  # - task: AzureCLI@2
+  #   displayName: Azure CLI
+  #   inputs:
+  #     azureSubscription: ACR Gabriela
+  #     scriptType: bash
+  #     scriptLocation: inlineScript
+  #     inlineScript: |
+  #       az --version
+  #       az account show
+
+#       TOKEN=$(az acr login --name andreiapp --expose-token --output tsv --query accessToken)
+#       docker login andreiapp.azurecr.io --username 00000000-0000-0000-0000-000000000000 --password-stdin <<< $TOKEN
+#       docker tag $(image-name) andreiapp.azurecr.io/images/weatherapp:latest
+#       docker images
+#       docker ps
+#       docker push wirtekregistry.azurecr.io/images/weatherapp
+
+#  - script:
+#       docker login andreiapp.azurecr.io
+#       docker tag $(image-name) andreiapp.azurecr.io/images/weatherapp
+#     displayName: 'Login and push into registry'
+
+#  - script:
+#       docker login -u andreiapp -p $(docker-hug-secret)
+#       docker push  andreiapp/weatherapp:latest
+#   displayName: 'Docker login and push'
